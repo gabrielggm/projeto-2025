@@ -1,0 +1,394 @@
+// Importa as bibliotecas necessárias
+const qrcode = require('qrcode-terminal');
+const { Client, Buttons, List, MessageMedia } = require('whatsapp-web.js');
+const client = new Client();
+
+// --- Configuração do WhatsApp Web Client ---
+// Evento para gerar e exibir o QR Code no terminal para autenticação
+client.on('qr', qr => {
+    qrcode.generate(qr, {small: true});
+});
+
+// Evento disparado quando o cliente está pronto e conectado ao WhatsApp
+client.on('ready', () => {
+    console.log('Tudo certo! WhatsApp conectado.');
+});
+
+// Inicializa o cliente do WhatsApp
+client.initialize();
+
+// --- Função Auxiliar para Delay ---
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
+// --- Simulação do Banco de Dados de Livros ---
+const acervoDeLivros = [
+    {
+        titulo: "Dom Casmurro",
+        autor: "Machado de Assis",
+        genero: "Romance",
+        preco: 29.90,
+        disponivel: true,
+        sinopse: "Uma obra-prima da literatura brasileira que narra a história de Bentinho e Capitu, e a dúvida sobre a traição dela."
+    },
+    {
+        titulo: "1984",
+        autor: "George Orwell",
+        genero: "Ficção Científica",
+        preco: 35.00,
+        disponivel: true,
+        sinopse: "Um romance distópico que explora os perigos do totalitarismo, da vigilância e da manipulação da verdade."
+    },
+    {
+        titulo: "O Pequeno Príncipe",
+        autor: "Antoine de Saint-Exupéry",
+        genero: "Infantil",
+        preco: 19.99,
+        disponivel: true,
+        sinopse: "Uma história poética e filosófica sobre um pequeno príncipe que viaja por diversos planetas, aprendendo sobre a vida, o amor e a amizade."
+    },
+    {
+        titulo: "Cem Anos de Solidão",
+        autor: "Gabriel García Márquez",
+        genero: "Realismo Mágico",
+        preco: 45.00,
+        disponivel: false,
+        sinopse: "Uma saga épica da família Buendía através de várias gerações na fictícia cidade de Macondo."
+    },
+    {
+        titulo: "Sapiens: Uma Breve História da Humanidade",
+        autor: "Yuval Noah Harari",
+        genero: "Não Ficção",
+        preco: 55.00,
+        disponivel: true,
+        sinopse: "Uma explanação fascinante sobre a história da humanidade, desde os primórdios até o presente, abordando a biologia, a cultura e a economia."
+    },
+    {
+        titulo: "Orgulho e Preconceito",
+        autor: "Jane Austen",
+        genero: "Romance",
+        preco: 32.00,
+        disponivel: true,
+        sinopse: "Clássico da literatura inglesa que explora as questões de classe, casamento e amor no século XIX."
+    },
+    {
+        titulo: "A Metamorfose",
+        autor: "Franz Kafka",
+        genero: "Ficção Absurda",
+        preco: 25.00,
+        disponivel: true,
+        sinopse: "Gregor Samsa acorda transformado em um inseto gigante, e a obra explora temas como alienação e absurdo da existência."
+    },
+    {
+        titulo: "Crime e Castigo",
+        autor: "Fiódor Dostoiévski",
+        genero: "Filosofia",
+        preco: 48.00,
+        disponivel: true,
+        sinopse: "Um estudante que comete um assassinato e lida com as consequências morais e psicológicas de seu ato."
+    },
+    {
+        titulo: "Frankenstein",
+        autor: "Mary Shelley",
+        genero: "Terror Gótico",
+        preco: 27.50,
+        disponivel: true,
+        sinopse: "A história de Victor Frankenstein e sua criatura, explorando temas de vida, morte e responsabilidade científica."
+    },
+    {
+        titulo: "O Senhor dos Anéis: A Sociedade do Anel",
+        autor: "J.R.R. Tolkien",
+        genero: "Fantasia Épica",
+        preco: 60.00,
+        disponivel: true,
+        sinopse: "O início da jornada de Frodo Bolseiro para destruir o Um Anel e salvar a Terra Média."
+    },
+    {
+        titulo: "Cosmos",
+        autor: "Carl Sagan",
+        genero: "Divulgação Científica",
+        preco: 52.00,
+        disponivel: true,
+        sinopse: "Uma exploração fascinante do universo, da ciência e do lugar da humanidade no cosmos."
+    },
+    {
+        titulo: "Ensaio sobre a Cegueira",
+        autor: "José Saramago",
+        genero: "Distopia",
+        preco: 38.00,
+        disponivel: true,
+        sinopse: "Uma epidemia de cegueira branca assola uma cidade, revelando a fragilidade da sociedade humana."
+    },
+    {
+        titulo: "A Revolução dos Bichos",
+        autor: "George Orwell",
+        genero: "Sátira Política",
+        preco: 22.00,
+        disponivel: true,
+        sinopse: "Uma fábula sobre animais que se rebelam contra seus donos humanos e criam sua própria sociedade, que eventualmente se corrompe."
+    },
+    {
+        titulo: "A Arte da Guerra",
+        autor: "Sun Tzu",
+        genero: "Estratégia",
+        preco: 28.00,
+        disponivel: true,
+        sinopse: "Um antigo tratado militar chinês que oferece princípios e táticas para a guerra, aplicáveis também à vida e negócios."
+    }
+];
+
+// --- Funções de Busca no Acervo ---
+function buscarLivroPorTitulo(titulo) {
+    return acervoDeLivros.filter(livro =>
+        livro.titulo.toLowerCase().includes(titulo.toLowerCase())
+    );
+}
+
+function buscarLivroPorAutor(autor) {
+    return acervoDeLivros.filter(livro =>
+        livro.autor.toLowerCase().includes(autor.toLowerCase())
+    );
+}
+
+function buscarLivroPorGenero(genero) {
+    return acervoDeLivros.filter(livro =>
+        livro.genero.toLowerCase().includes(genero.toLowerCase())
+    );
+}
+
+// --- Lógica Principal do Chatbot ---
+client.on('message', async msg => {
+    const chat = await msg.getChat();
+    const contact = await msg.getContact();
+    const name = contact.pushname;
+    const userMessage = msg.body.toLowerCase();
+
+    // --- Tratamento da Mensagem de Boas-Vindas e Menu Inicial ---
+    if (userMessage.match(/(menu|dia|tarde|noite|oi|olá|ola|livros)/i) && msg.from.endsWith('@c.us')) {
+        await delay(1000);
+        await chat.sendStateTyping();
+        await delay(1000);
+        await client.sendMessage(msg.from, `Olá, ${name.split(" ")[0]}! Sou o assistente virtual da nossa biblioteca. Como posso ajudá-lo hoje?\n\nPor favor, digite o *número* da opção desejada:\n\n*1* - Buscar um livro\n*2* - Ver sugestões\n*3* - Tirar dúvidas gerais\n\n`);
+        return;
+    }
+
+    // --- Lógica para "1 - Buscar um livro" ---
+    if (userMessage === '1' && msg.from.endsWith('@c.us')) {
+        await delay(1000);
+        await chat.sendStateTyping();
+        await delay(1000);
+        await client.sendMessage(msg.from, 'Ótimo! Para buscar um livro, me diga por qual critério você gostaria de pesquisar:\n\n*Título* (ex: "Dom Casmurro")\n*Autor* (ex: "Machado de Assis")\n*Gênero* (ex: "Ficção Científica")\n\nOu digite "Voltar" para o menu principal.');
+        return;
+    }
+
+    // --- Lógica para "2 - Ver sugestões" ---
+    if (userMessage === '2' && msg.from.endsWith('@c.us')) {
+        await delay(1000);
+        await chat.sendStateTyping();
+        await delay(1000);
+        const livrosDisponiveis = acervoDeLivros.filter(livro => livro.disponivel);
+        if (livrosDisponiveis.length > 0) {
+            let sugestoes = 'Aqui estão algumas sugestões de livros disponíveis:\n\n';
+            livrosDisponiveis.slice(0, 3).forEach(livro => {
+                sugestoes += `*${livro.titulo}* por ${livro.autor} (${livro.genero}) - R$ ${livro.preco.toFixed(2)}\n`;
+            });
+            await client.sendMessage(msg.from, sugestoes + '\nSe quiser *mais detalhes* sobre algum, *digite o nome completo do título*! (Ex: "O Pequeno Príncipe")\n\nOu digite "Menu" para ver as opções principais novamente.');
+        } else {
+            await client.sendMessage(msg.from, 'No momento, não temos sugestões disponíveis. Tente buscar um livro específico ou retorne mais tarde!\n\nDigite "Menu" para ver as opções principais novamente.');
+        }
+        return;
+    }
+
+    // --- Lógica para "3 - Tirar dúvidas gerais" ---
+    if (userMessage === '3' && msg.from.endsWith('@c.us')) {
+        await delay(1000);
+        await chat.sendStateTyping();
+        await delay(1000);
+        await client.sendMessage(msg.from, 'Para dúvidas gerais, você pode:\n\n1. *Visitar nosso site:* [https://sua-biblioteca.com]\n2. *Falar com um atendente:* Em horário comercial, você pode ligar para (XX) XXXX-XXXX.\n\nOu digite "Menu" para voltar às opções principais.');
+        return;
+    }
+
+    // --- Lógica de Busca por Título ---
+    const titulosConhecidos = acervoDeLivros.map(livro => livro.titulo.toLowerCase());
+    const isTitleSearch = titulosConhecidos.some(titulo => userMessage.includes(titulo));
+
+    if ((userMessage.includes('titulo') || userMessage.includes('livro') || isTitleSearch) && msg.from.endsWith('@c.us')) {
+        let termoBusca = userMessage;
+
+        if (userMessage.includes('livro de titulo') || userMessage.includes('titulo') || userMessage.includes('livro')) {
+             termoBusca = termoBusca.replace(/livro de titulo /g, '')
+                                     .replace('titulo ', '')
+                                     .replace('livro ', '')
+                                     .trim();
+        }
+
+        if (!termoBusca && isTitleSearch) {
+            for (const titulo of titulosConhecidos) {
+                if (userMessage.includes(titulo)) {
+                    termoBusca = titulo;
+                    break;
+                }
+            }
+        }
+
+        if (termoBusca) {
+            await delay(1000);
+            await chat.sendStateTyping();
+            await delay(1000);
+            const resultados = buscarLivroPorTitulo(termoBusca);
+            if (resultados.length > 0) {
+                let mensagemResultados = `Encontrei ${resultados.length} livro(s) com o título "${termoBusca}":\n\n`;
+                resultados.forEach(livro => {
+                    mensagemResultados += `*Título:* ${livro.titulo}\n`;
+                    mensagemResultados += `*Autor:* ${livro.autor}\n`;
+                    mensagemResultados += `*Gênero:* ${livro.genero}\n`;
+                    mensagemResultados += `*Preço:* R$ ${livro.preco.toFixed(2)}\n`;
+                    mensagemResultados += `*Disponível:* ${livro.disponivel ? 'Sim' : 'Não'}\n`;
+                    if (livro.sinopse) {
+                        mensagemResultados += `*Sinopse:* ${livro.sinopse}\n`;
+                    }
+                    mensagemResultados += `\n---\n\n`;
+                });
+                await client.sendMessage(msg.from, mensagemResultados + 'Posso te ajudar a buscar outro livro ou retornar ao *menu*?');
+            } else {
+                await client.sendMessage(msg.from, `Não encontrei nenhum livro com o título "${termoBusca}". Tente novamente com outro termo ou digite "1" para buscar novamente.`);
+            }
+        } else {
+            await client.sendMessage(msg.from, 'Por favor, digite o *título completo* do livro que você está procurando (ex: "O Pequeno Príncipe").');
+        }
+        return;
+    }
+
+    // --- Lógica de Busca por Autor ---
+    const autoresConhecidos = acervoDeLivros.map(livro => livro.autor.toLowerCase());
+    const isAuthorSearch = autoresConhecidos.some(autor => userMessage.includes(autor));
+
+    if (userMessage.includes('autor') || isAuthorSearch && msg.from.endsWith('@c.us')) {
+        let termoBusca = userMessage;
+
+        if (userMessage.includes('livro de autor') || userMessage.includes('autor') || userMessage.includes('livro')) {
+            termoBusca = termoBusca.replace(/livro de autor /g, '')
+                                   .replace('autor ', '')
+                                   .replace('livro ', '')
+                                   .trim();
+        }
+
+        if (!termoBusca && isAuthorSearch) {
+            for (const autor of autoresConhecidos) {
+                if (userMessage.includes(autor)) {
+                    termoBusca = autor;
+                    break;
+                }
+            }
+        }
+        
+        if (termoBusca) {
+            await delay(1000);
+            await chat.sendStateTyping();
+            await delay(1000);
+            const resultados = buscarLivroPorAutor(termoBusca);
+            if (resultados.length > 0) {
+                let mensagemResultados = `Encontrei ${resultados.length} livro(s) do autor "${termoBusca}":\n\n`;
+                resultados.forEach(livro => {
+                    mensagemResultados += `*Título:* ${livro.titulo}\n`;
+                    mensagemResultados += `*Autor:* ${livro.autor}\n`;
+                    mensagemResultados += `*Gênero:* ${livro.genero}\n`;
+                    mensagemResultados += `*Preço:* R$ ${livro.preco.toFixed(2)}\n`;
+                    mensagemResultados += `*Disponível:* ${livro.disponivel ? 'Sim' : 'Não'}\n`;
+                    if (livro.sinopse) {
+                        mensagemResultados += `*Sinopse:* ${livro.sinopse}\n`;
+                    }
+                    mensagemResultados += `\n---\n\n`;
+                });
+                await client.sendMessage(msg.from, mensagemResultados + 'Posso te ajudar a buscar outro livro ou retornar ao *menu*?');
+            } else {
+                await client.sendMessage(msg.from, `Não encontrei nenhum livro do autor "${termoBusca}". Tente novamente com outro termo ou digite "1" para buscar novamente.`);
+            }
+        } else {
+            await client.sendMessage(msg.from, 'Por favor, digite o *nome do autor* que você está procurando (ex: "Machado de Assis").');
+        }
+        return;
+    }
+
+    // --- Lógica de Busca por Gênero (COM SUGESTÃO DE GÊNEROS EXISTENTES) ---
+    const generosConhecidos = [...new Set(acervoDeLivros.map(livro => livro.genero.toLowerCase()))];
+    const isGeneroSearch = generosConhecidos.some(genero => userMessage.includes(genero));
+
+    if (userMessage.includes('gênero') || isGeneroSearch && msg.from.endsWith('@c.us')) {
+        let termoBusca = userMessage;
+
+        if (userMessage.includes('livro de gênero') || userMessage.includes('gênero') || userMessage.includes('livro')) {
+            termoBusca = termoBusca.replace(/livro de gênero /g, '')
+                                     .replace('gênero ', '')
+                                     .replace('livro ', '')
+                                     .trim();
+        }
+        
+        if (!termoBusca && isGeneroSearch) {
+            for (const genero of generosConhecidos) {
+                if (userMessage.includes(genero)) {
+                    termoBusca = genero;
+                    break;
+                }
+            }
+        }
+
+        if (termoBusca) {
+            await delay(1000);
+            await chat.sendStateTyping();
+            await delay(1000);
+            const resultados = buscarLivroPorGenero(termoBusca);
+            if (resultados.length > 0) {
+                let mensagemResultados = `Encontrei ${resultados.length} livro(s) do gênero "${termoBusca}":\n\n`;
+                resultados.forEach(livro => {
+                    mensagemResultados += `*Título:* ${livro.titulo}\n`;
+                    mensagemResultados += `*Autor:* ${livro.autor}\n`;
+                    mensagemResultados += `*Gênero:* ${livro.genero}\n`;
+                    mensagemResultados += `*Preço:* R$ ${livro.preco.toFixed(2)}\n`;
+                    mensagemResultados += `*Disponível:* ${livro.disponivel ? 'Sim' : 'Não'}\n`;
+                    if (livro.sinopse) {
+                        mensagemResultados += `*Sinopse:* ${livro.sinopse}\n`;
+                    }
+                    mensagemResultados += `\n---\n\n`;
+                });
+                await client.sendMessage(msg.from, mensagemResultados + 'Posso te ajudar a buscar outro livro ou retornar ao *menu*?');
+            } else {
+                // NOVO: Sugestão de gêneros disponíveis
+                let mensagemSugestao = `Não encontrei nenhum livro do gênero "${termoBusca}".\n\n`;
+                
+                // Filtra apenas gêneros que tenham livros disponíveis para sugerir
+                const generosComLivrosDisponiveis = [...new Set(acervoDeLivros
+                    .filter(livro => livro.disponivel)
+                    .map(livro => livro.genero)
+                )];
+
+                if (generosComLivrosDisponiveis.length > 0) {
+                    mensagemSugestao += `Que tal explorar outros gêneros que temos?\n*Gêneros disponíveis:* ${generosComLivrosDisponiveis.join(', ')}.\n\n`;
+                } else {
+                    mensagemSugestao += `No momento, não temos livros em outros gêneros disponíveis.`;
+                }
+                mensagemSugestao += `\n\nTente novamente com outro termo ou digite "1" para buscar por outro critério, ou "Menu" para voltar.`;
+                await client.sendMessage(msg.from, mensagemSugestao);
+            }
+        } else {
+            await client.sendMessage(msg.from, 'Por favor, digite o *gênero* do livro que você está procurando (ex: "Ficção Científica").');
+        }
+        return;
+    }
+
+    // --- Lógica para Voltar ao Menu Principal ---
+    if (userMessage.includes('voltar') || userMessage.includes('menu') && msg.from.endsWith('@c.us')) {
+        await delay(1000);
+        await chat.sendStateTyping();
+        await delay(1000);
+        await client.sendMessage(msg.from, `Certo, ${name.split(" ")[0]}! De volta ao menu principal. Como posso ajudá-lo hoje?\n\nPor favor, digite o *número* da opção desejada:\n\n*1* - Buscar um livro\n*2* - Ver sugestões\n*3* - Tirar dúvidas gerais\n\n`);
+        return;
+    }
+
+    // --- Resposta Padrão para Mensagens Não Reconhecidas ---
+    if (msg.from.endsWith('@c.us')) {
+        await delay(1000);
+        await chat.sendStateTyping();
+        await delay(1000);
+        await client.sendMessage(msg.from, 'Desculpe, não entendi sua solicitação. Por favor, digite "Menu" para ver as opções disponíveis ou tente reformular sua pergunta.');
+    }
+});
